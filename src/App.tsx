@@ -922,7 +922,13 @@ export default function App() {
         onClose={() => setIsSyncBackupOpen(false)}
         currentUser={currentUser}
         onSyncCompleted={(payload) => {
-          showToast(`Backup sincronizado com sucesso (${payload.metadata.totalDocuments} registros formatados para Firestore)!`);
+          showToast(`Backup sincronizado com sucesso (${payload.metadata.totalDocuments} registros salvos no Firebase Firestore)!`);
+        }}
+        onReloadCompanyData={() => {
+          if (currentUser?.companyId) {
+            loadCompanyData(currentUser.companyId);
+            showToast('Dados da empresa atualizados a partir do Firebase Firestore!');
+          }
         }}
       />
 

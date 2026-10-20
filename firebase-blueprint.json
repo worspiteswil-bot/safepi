@@ -1,0 +1,169 @@
+{
+  "entities": {
+    "Organization": {
+      "title": "Organization",
+      "description": "Empresa cadastrada no sistema multi-tenant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "document": { "type": "string" },
+        "segment": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "ownerId", "createdAt"]
+    },
+    "EPIItem": {
+      "title": "EPIItem",
+      "description": "Equipamento de Proteção Individual no estoque",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "caNumber": { "type": "string" },
+        "caExpiryDate": { "type": "string" },
+        "caStatus": { "type": "string" },
+        "stockQuantity": { "type": "number" },
+        "minStockQuantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "standardReplacementDays": { "type": "number" },
+        "companyId": { "type": "string" }
+      },
+      "required": ["id", "code", "name", "category", "stockQuantity", "unit"]
+    },
+    "Collaborator": {
+      "title": "Collaborator",
+      "description": "Colaborador ou trabalhador vinculado ao controle de EPIs da empresa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "cpf": { "type": "string" },
+        "registration": { "type": "string" },
+        "role": { "type": "string" },
+        "department": { "type": "string" },
+        "admissionDate": { "type": "string" },
+        "status": { "type": "string" },
+        "shoeSize": { "type": "string" },
+        "gloveSize": { "type": "string" },
+        "companyId": { "type": "string" }
+      },
+      "required": ["id", "name", "cpf", "registration", "role", "department", "admissionDate", "status"]
+    },
+    "EPIDelivery": {
+      "title": "EPIDelivery",
+      "description": "Registro de entrega de EPI com assinatura e conformidade NR-6",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "collaboratorId": { "type": "string" },
+        "collaboratorName": { "type": "string" },
+        "epiId": { "type": "string" },
+        "epiName": { "type": "string" },
+        "caNumber": { "type": "string" },
+        "quantity": { "type": "number" },
+        "deliveryDate": { "type": "string" },
+        "expectedExchangeDate": { "type": "string" },
+        "status": { "type": "string" },
+        "reason": { "type": "string" },
+        "deliveredBy": { "type": "string" },
+        "signatureDataUrl": { "type": "string" },
+        "biometricValidationHash": { "type": "string" },
+        "biometricMatchScore": { "type": "number" },
+        "companyId": { "type": "string" }
+      },
+      "required": ["id", "code", "collaboratorId", "collaboratorName", "epiId", "epiName", "quantity", "deliveryDate", "status", "deliveredBy"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Registro de movimentação do estoque de EPI (entrada, saída, devolução, descarte)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string" },
+        "epiId": { "type": "string" },
+        "epiName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "previousStock": { "type": "number" },
+        "newStock": { "type": "number" },
+        "invoiceNumber": { "type": "string" },
+        "supplier": { "type": "string" },
+        "reason": { "type": "string" },
+        "responsible": { "type": "string" },
+        "companyId": { "type": "string" }
+      },
+      "required": ["id", "type", "date", "epiId", "epiName", "quantity", "previousStock", "newStock", "responsible"]
+    },
+    "CompanyHeaderSettings": {
+      "title": "CompanyHeaderSettings",
+      "description": "Configuração personalizada de cabeçalho e logotipo da empresa",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "document": { "type": "string" },
+        "segment": { "type": "string" },
+        "address": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "phone": { "type": "string" },
+        "logoType": { "type": "string" },
+        "logoIcon": { "type": "string" },
+        "logoColor": { "type": "string" },
+        "logoImageUrl": { "type": "string" }
+      },
+      "required": ["title", "logoType", "logoIcon", "logoColor"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Perfil de usuário titular ou colaborador da empresa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "department": { "type": "string" },
+        "userType": { "type": "string" },
+        "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role", "userType", "companyId"]
+    }
+  },
+  "firestore": {
+    "/organizations/{orgId}": {
+      "schema": { "$ref": "#/entities/Organization" },
+      "description": "Empresas cadastradas no ecossistema multi-tenant SafeGuard EPI"
+    },
+    "/organizations/{orgId}/epis/{epiId}": {
+      "schema": { "$ref": "#/entities/EPIItem" },
+      "description": "Catálogo de EPIs e saldos em estoque da empresa"
+    },
+    "/organizations/{orgId}/collaborators/{colabId}": {
+      "schema": { "$ref": "#/entities/Collaborator" },
+      "description": "Colaboradores registrados na empresa para recebimento de EPI"
+    },
+    "/organizations/{orgId}/deliveries/{deliveryId}": {
+      "schema": { "$ref": "#/entities/EPIDelivery" },
+      "description": "Histórico e termos de entrega de EPI assinados eletronicamente"
+    },
+    "/organizations/{orgId}/movements/{movementId}": {
+      "schema": { "$ref": "#/entities/StockMovement" },
+      "description": "Livro de movimentação de entradas, baixas e devoluções"
+    },
+    "/organizations/{orgId}/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/CompanyHeaderSettings" },
+      "description": "Configurações de identidade visual e cabeçalho da empresa"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Perfis de usuários com identificação de empresa e permissões"
+    }
+  }
+}
