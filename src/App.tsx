@@ -32,6 +32,7 @@ import { AuthService, SystemUser } from './services/authService';
 import { HeaderConfigModal, HEADER_ICONS_MAP } from './components/HeaderConfigModal';
 import { SyncBackupModal } from './components/SyncBackupModal';
 import { CompanyTeamModal } from './components/CompanyTeamModal';
+import { DocumentValidationModal } from './components/DocumentValidationModal';
 import { HeaderConfig, CloudBackupPayload } from './services/storage';
 
 import {
@@ -55,6 +56,7 @@ import {
   Trash2,
   Building,
   UserPlus,
+  QrCode,
 } from 'lucide-react';
 
 type NavigationTab =
@@ -67,12 +69,32 @@ type NavigationTab =
   | 'movimentacoes';
 
 export default function App() {
-  // Main Data States
-  const [epis, setEpis] = useState<EPIItem[]>([]);
-  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-  const [deliveries, setDeliveries] = useState<EPIDelivery[]>([]);
-  const [movements, setMovements] = useState<StockMovement[]>([]);
-  const [alerts, setAlerts] = useState<AutomaticAlert[]>([]);
+  // Main Data States (initialized immediately to avoid empty state race conditions)
+  const [epis, setEpis] = useState<EPIItem[]>(() => {
+    const user = AuthService.getCurrentUser();
+    return user?.companyId ? StorageService.getEPIs(user.companyId) : [];
+  });
+  const [collaborators, setCollaborators] = useState<Collaborator[]>(() => {
+    const user = AuthService.getCurrentUser();
+    return user?.companyId ? StorageService.getCollaborators(user.companyId) : [];
+  });
+  const [deliveries, setDeliveries] = useState<EPIDelivery[]>(() => {
+    const user = AuthService.getCurrentUser();
+    return user?.companyId ? StorageService.getDeliveries(user.companyId) : [];
+  });
+  const [movements, setMovements] = useState<StockMovement[]>(() => {
+    const user = AuthService.getCurrentUser();
+    return user?.companyId ? StorageService.getMovements(user.companyId) : [];
+  });
+  const [alerts, setAlerts] = useState<AutomaticAlert[]>(() => {
+    const user = AuthService.getCurrentUser();
+    if (!user?.companyId) return [];
+    return StorageService.calculateAlerts(
+      StorageService.getEPIs(user.companyId),
+      StorageService.getDeliveries(user.companyId),
+      StorageService.getCollaborators(user.companyId)
+    );
+  });
 
   // Navigation
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
@@ -116,6 +138,22 @@ export default function App() {
 
   // Company Team / Collaborator Logins Management
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+
+  // Document Validation Portal (QR Code & Autenticidade)
+  const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+  const [validationDocCode, setValidationDocCode] = useState<string | undefined>();
+
+  // Check URL query parameters for QR Code validation
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const docCode = params.get('validar_doc') || params.get('doc');
+      if (docCode) {
+        setValidationDocCode(docCode);
+        setIsValidationModalOpen(true);
+      }
+    }
+  }, []);
 
   const handleSaveHeaderConfig = (newConfig: HeaderConfig) => {
     StorageService.saveHeaderConfig(newConfig, currentUser?.companyId);
@@ -500,6 +538,18 @@ export default function App() {
             )}
 
             <button
+              onClick={() => {
+                setValidationDocCode(undefined);
+                setIsValidationModalOpen(true);
+              }}
+              className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="Consultar autenticidade de documento ou ler QR Code"
+            >
+              <QrCode className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline">Validar QR Code</span>
+            </button>
+
+            <button
               onClick={() => handleOpenNewDelivery()}
               className="px-3 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors whitespace-nowrap shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
@@ -617,6 +667,26 @@ export default function App() {
                         >
                           <Palette className="w-4 h-4 text-amber-500" />
                           <span>Personalizar Logo & Cabeçalho</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsUserMenuOpen(false);
+                            setValidationDocCode(undefined);
+                            setIsValidationModalOpen(true);
+                          }}
+                          className="w-full px-3 py-2 text-xs font-medium text-slate-700 hover:bg-emerald-50 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            <QrCode className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div>
+                              <div className="font-semibold text-slate-900 leading-tight">Validar Documento / QR Code</div>
+                              <div className="text-[10px] text-slate-500">Consultar autenticidade de relatórios NR-6</div>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            NR-6
+                          </span>
                         </button>
                         <button
                           onClick={() => {
@@ -855,6 +925,17 @@ export default function App() {
             : undefined
         }
         onDeliveryCreated={handleDeliveryCreated}
+        onOpenNewCollaborator={() => {
+          setIsNewDeliveryOpen(false);
+          setCollaboratorToEdit(null);
+          setIsCollaboratorModalOpen(true);
+        }}
+        onOpenNewEPI={() => {
+          setIsNewDeliveryOpen(false);
+          setEpiToEdit(null);
+          setIsEPIEditOpen(true);
+        }}
+        onSaveQuickCollaborator={handleSaveCollaborator}
       />
 
       <StockMovementModal
@@ -942,6 +1023,35 @@ export default function App() {
           onShowToast={showToast}
         />
       )}
+
+      {/* Document Validation & Original Document Portal (QR Code) */}
+      <DocumentValidationModal
+        isOpen={isValidationModalOpen}
+        onClose={() => {
+          setIsValidationModalOpen(false);
+          setValidationDocCode(undefined);
+          if (typeof window !== 'undefined' && window.location.search) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('validar_doc');
+            url.searchParams.delete('doc');
+            url.searchParams.delete('tipo');
+            url.searchParams.delete('empresa');
+            window.history.replaceState(
+              {},
+              '',
+              url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '')
+            );
+          }
+        }}
+        documentCode={validationDocCode}
+        onViewCollaboratorFicha={(colabId) => {
+          const colab = collaborators.find((c) => c.id === colabId);
+          if (colab) {
+            setFichaCollaborator(colab);
+            setIsFichaOpen(true);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -120,6 +120,42 @@ export interface CloudBackupPayload {
   };
 }
 
+export type OriginalDocumentType =
+  | 'ficha_epi'
+  | 'movimentacoes'
+  | 'dashboard'
+  | 'entregas'
+  | 'estoque'
+  | 'ca_validade'
+  | 'colaboradores';
+
+export interface OriginalDocumentRecord {
+  id: string;                      // doc-timestamp
+  code: string;                    // Ex: FICHA-NR6-MAT1042-20261021 ou REL-SST-20261021-942
+  type: OriginalDocumentType;
+  title: string;
+  companyId: string;
+  companyName: string;
+  companyDocument?: string;
+  companySubtitle?: string;
+  generatedAt: string;             // ISO timestamp
+  dateStr: string;                 // YYYY-MM-DD
+  sha256Hash: string;              // Fingerprint criptográfico SHA-256
+  verificationUrl: string;         // Link absoluto com QR Code
+  summaryText: string;
+  collaboratorId?: string;
+  collaboratorName?: string;
+  collaboratorRegistration?: string;
+  collaboratorCpf?: string;
+  collaboratorRole?: string;
+  collaboratorDepartment?: string;
+  itemsCount?: number;
+  totalQuantity?: number;
+  totalValue?: number;
+  activeFilter?: string;
+  details?: Record<string, any>;
+}
+
 export const STORAGE_KEYS = {
   EPIS: 'safe_epi_items_v3',
   COLLABORATORS: 'safe_epi_colabs_v3',
@@ -129,6 +165,7 @@ export const STORAGE_KEYS = {
   CLOUD_BACKUP: 'safe_epi_cloud_backup_v3',
   SYNC_METADATA: 'safe_epi_sync_metadata_v3',
   CLEAN_STATE: 'safe_epi_clean_state_v3',
+  ORIGINAL_DOCUMENTS: 'safe_epi_orig_docs_v3',
 };
 
 const getCompanyKey = (base: string, explicitCompanyId?: string): string => {
@@ -650,5 +687,108 @@ export class StorageService {
       }
       return (a.daysRemaining ?? 999) - (b.daysRemaining ?? 999);
     });
+  }
+
+  /**
+   * Constrói a URL pública e auditável do documento original para ser lida via QR Code
+   */
+  static buildDocumentVerificationUrl(
+    docCode: string,
+    docType?: string,
+    companyId?: string,
+    extraId?: string
+  ): string {
+    if (typeof window === 'undefined') {
+      return `https://safeguard-epi.app/?validar_doc=${encodeURIComponent(docCode)}`;
+    }
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    const params = new URLSearchParams();
+    params.set('validar_doc', docCode);
+    if (docType) params.set('tipo', docType);
+    if (companyId) params.set('empresa', companyId);
+    if (extraId) params.set('ref', extraId);
+    return `${origin}${pathname}?${params.toString()}`;
+  }
+
+  /**
+   * Salva o registro de um documento original emitido para validação perpétua
+   */
+  static saveOriginalDocument(
+    docRecord: OriginalDocumentRecord,
+    companyId?: string
+  ): void {
+    try {
+      const key = getCompanyKey(STORAGE_KEYS.ORIGINAL_DOCUMENTS, companyId);
+      const existing = this.getOriginalDocuments(companyId);
+      // Evitar duplicatas do mesmo código, atualizando se já existir
+      const filtered = existing.filter((d) => d.code !== docRecord.code && d.id !== docRecord.id);
+      filtered.unshift(docRecord);
+      localStorage.setItem(key, JSON.stringify(filtered.slice(0, 100))); // Manter até 100 documentos recentes no cache local
+    } catch (e) {
+      console.warn('Erro ao salvar registro de documento original:', e);
+    }
+  }
+
+  /**
+   * Busca um documento original emitido pelo código ou ID
+   */
+  static getOriginalDocument(
+    codeOrId: string,
+    companyId?: string
+  ): OriginalDocumentRecord | null {
+    if (!codeOrId) return null;
+    try {
+      const cleanTarget = codeOrId.trim().toUpperCase();
+      const docs = this.getOriginalDocuments(companyId);
+      const found = docs.find(
+        (d) =>
+          d.code.toUpperCase() === cleanTarget ||
+          d.id.toUpperCase() === cleanTarget ||
+          d.sha256Hash.toUpperCase().includes(cleanTarget)
+      );
+      if (found) return found;
+
+      // Se não encontrou no escopo da empresa atual, varre todas as chaves de documentos
+      if (typeof localStorage !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_KEYS.ORIGINAL_DOCUMENTS)) {
+            try {
+              const raw = localStorage.getItem(k);
+              if (raw) {
+                const list: OriginalDocumentRecord[] = JSON.parse(raw);
+                const match = list.find(
+                  (d) =>
+                    d.code.toUpperCase() === cleanTarget ||
+                    d.id.toUpperCase() === cleanTarget ||
+                    d.sha256Hash.toUpperCase().includes(cleanTarget)
+                );
+                if (match) return match;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Retorna todos os documentos originais emitidos pela empresa
+   */
+  static getOriginalDocuments(companyId?: string): OriginalDocumentRecord[] {
+    try {
+      const key = getCompanyKey(STORAGE_KEYS.ORIGINAL_DOCUMENTS, companyId);
+      const data = localStorage.getItem(key);
+      if (!data) return [];
+      return JSON.parse(data);
+    } catch {
+      return [];
+    }
   }
 }

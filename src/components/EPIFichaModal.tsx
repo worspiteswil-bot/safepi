@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Collaborator, EPIDelivery, EPIItem } from '../types/epi';
 import { NR6_LEGAL_TERM, CURRENT_DATE_STR, StorageService } from '../services/storage';
 import { PDFGenerator } from '../utils/pdfGenerator';
-import { Printer, X, ShieldCheck, Download, AlertTriangle, FileText, FileDown, Loader2, Pencil } from 'lucide-react';
+import { generateQRCodeDataUrl } from '../utils/qrCodeGenerator';
+import { Printer, X, ShieldCheck, Download, AlertTriangle, FileText, FileDown, Loader2, Pencil, QrCode } from 'lucide-react';
 
 interface EPIFichaModalProps {
   collaborator: Collaborator;
@@ -22,11 +23,53 @@ export const EPIFichaModal: React.FC<EPIFichaModalProps> = ({
   onOpenHeaderConfig,
 }) => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const headerConfig = StorageService.getHeaderConfig();
   const companyName = headerConfig.title || 'SafeGuard EPI';
   const companyDocument = headerConfig.document;
   const companySubtitle = headerConfig.subtitle || 'Departamento de Segurança e Medicina do Trabalho (SESMT)';
   const companyContact = [headerConfig.address, headerConfig.phone, headerConfig.contactEmail].filter(Boolean).join(' • ');
+
+  const docCode = `FICHA-NR6-${collaborator.registration}-${CURRENT_DATE_STR.replace(/-/g, '')}`;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const verificationUrl = StorageService.buildDocumentVerificationUrl(
+      docCode,
+      'ficha_epi',
+      companyDocument,
+      collaborator.id
+    );
+
+    // Salvar registro de documento original para consulta imediata via QR Code
+    const colabDeliveriesCount = deliveries.filter((d) => d.collaboratorId === collaborator.id).length;
+    StorageService.saveOriginalDocument({
+      id: `doc-${docCode.toLowerCase()}`,
+      code: docCode,
+      type: 'ficha_epi',
+      title: `Ficha de Registro e Fornecimento de EPI (NR-6) - ${collaborator.name}`,
+      companyId: 'default',
+      companyName,
+      companyDocument,
+      companySubtitle,
+      generatedAt: new Date().toISOString(),
+      dateStr: CURRENT_DATE_STR,
+      sha256Hash: `SHA256-${Math.random().toString(36).substring(2, 10).toUpperCase()}${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      verificationUrl,
+      summaryText: `Ficha Oficial NR-6 emitida para o colaborador ${collaborator.name} (Matrícula: ${collaborator.registration}, CPF: ${collaborator.cpf}) contendo ${colabDeliveriesCount} registros de fornecimento com biometria facial e assinatura digital.`,
+      collaboratorId: collaborator.id,
+      collaboratorName: collaborator.name,
+      collaboratorRegistration: collaborator.registration,
+      collaboratorCpf: collaborator.cpf,
+      collaboratorRole: collaborator.role,
+      collaboratorDepartment: collaborator.department,
+      itemsCount: colabDeliveriesCount,
+    });
+
+    generateQRCodeDataUrl(verificationUrl, 120).then((dataUrl) => {
+      setQrCodeUrl(dataUrl);
+    });
+  }, [isOpen, docCode, collaborator, companyName, companyDocument, companySubtitle, deliveries]);
 
   if (!isOpen) return null;
 
@@ -36,7 +79,7 @@ export const EPIFichaModal: React.FC<EPIFichaModalProps> = ({
     try {
       setIsGeneratingPDF(true);
       await new Promise((resolve) => setTimeout(resolve, 80));
-      PDFGenerator.generateFichaEPIPDF(collaborator, deliveries, epis);
+      await PDFGenerator.generateFichaEPIPDF(collaborator, deliveries, epis);
     } catch (err) {
       console.error('Erro ao gerar PDF da ficha:', err);
       window.print();
@@ -201,13 +244,30 @@ export const EPIFichaModal: React.FC<EPIFichaModalProps> = ({
                 </div>
               </div>
             </div>
-            <div className="text-left md:text-right shrink-0">
-              <span className="inline-block px-2.5 py-1 text-xs font-bold text-slate-900 bg-slate-100 rounded border border-slate-300">
-                FICHA DE REGISTRO DE FORNECIMENTO DE EPI
-              </span>
-              <p className="text-[11px] text-slate-500 mt-1 font-mono">
-                Portaria MTP nº 2.175/2022 (NR-6, item 6.5.1, alínea 'h')
-              </p>
+            <div className="flex items-center gap-3 shrink-0">
+              {qrCodeUrl && (
+                <div className="flex flex-col items-center bg-white p-1 rounded border border-slate-200 shadow-2xs">
+                  <img
+                    src={qrCodeUrl}
+                    alt="QR Code de Autenticidade do Documento Original"
+                    className="w-14 h-14 object-contain"
+                  />
+                  <span className="text-[8px] font-mono font-bold text-slate-700 uppercase mt-0.5 tracking-tighter">
+                    Doc Original
+                  </span>
+                </div>
+              )}
+              <div className="text-left md:text-right">
+                <span className="inline-block px-2.5 py-1 text-xs font-bold text-slate-900 bg-slate-100 rounded border border-slate-300">
+                  FICHA DE REGISTRO DE FORNECIMENTO DE EPI
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1 font-mono">
+                  Portaria MTP nº 2.175/2022 (NR-6, item 6.5.1, alínea 'h')
+                </p>
+                <p className="text-[9px] font-mono text-emerald-700 font-semibold mt-0.5">
+                  Cód: {docCode}
+                </p>
+              </div>
             </div>
           </div>
 

@@ -16,6 +16,7 @@ import {
   Printer,
   FileText,
   FileDown,
+  Loader2,
 } from 'lucide-react';
 
 interface MovementsAuditViewProps {
@@ -85,12 +86,18 @@ export const MovementsAuditView: React.FC<MovementsAuditViewProps> = ({
     document.body.removeChild(link);
   };
 
-  const handleDownloadPDF = () => {
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const handleDownloadPDF = async () => {
     try {
-      PDFGenerator.generateMovementsAuditPDF(filtered, epis, typeFilter, searchTerm);
+      setIsGeneratingPDF(true);
+      await new Promise((r) => setTimeout(r, 60));
+      await PDFGenerator.generateMovementsAuditPDF(filtered, epis, typeFilter, searchTerm);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       window.print();
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -155,11 +162,16 @@ export const MovementsAuditView: React.FC<MovementsAuditViewProps> = ({
           </button>
           <button
             onClick={handleDownloadPDF}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
+            disabled={isGeneratingPDF}
+            className="px-3.5 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer disabled:opacity-50"
             title="Baixar diretamente o arquivo PDF oficial com todas as páginas"
           >
-            <FileDown className="w-3.5 h-3.5 text-amber-600" />
-            <span>Baixar PDF</span>
+            {isGeneratingPDF ? (
+              <Loader2 className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5 text-amber-600" />
+            )}
+            <span>{isGeneratingPDF ? 'Gerando PDF...' : 'Baixar PDF'}</span>
           </button>
           <button
             onClick={handlePrint}

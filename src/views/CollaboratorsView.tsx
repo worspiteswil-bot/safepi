@@ -108,7 +108,7 @@ export const CollaboratorsView: React.FC<CollaboratorsViewProps> = ({
     try {
       setIsGeneratingPDF(true);
       await new Promise((r) => setTimeout(r, 60));
-      PDFGenerator.generateCollaboratorsPDF(filteredCollaborators, searchTerm);
+      await PDFGenerator.generateCollaboratorsPDF(filteredCollaborators, searchTerm);
     } catch (err) {
       console.error('Erro ao gerar PDF de colaboradores:', err);
       window.print();

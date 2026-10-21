@@ -106,7 +106,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     try {
       setIsGeneratingPDF(true);
       await new Promise((r) => setTimeout(r, 60));
-      PDFGenerator.generateDashboardExecutivePDF(epis, deliveries, collaborators, movements);
+      await PDFGenerator.generateDashboardExecutivePDF(epis, deliveries, collaborators, movements);
     } catch (err) {
       console.error('Erro ao gerar PDF do painel:', err);
       window.print();

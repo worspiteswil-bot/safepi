@@ -159,7 +159,7 @@ export const CAExpiryView: React.FC<CAExpiryViewProps> = ({
     try {
       setIsGeneratingPDF(true);
       await new Promise((r) => setTimeout(r, 60));
-      PDFGenerator.generateCAExpiryPDF(filteredEpis, deliveries, activeTab, searchTerm);
+      await PDFGenerator.generateCAExpiryPDF(filteredEpis, deliveries, activeTab, searchTerm);
     } catch (err) {
       console.error('Erro ao gerar PDF de C.A.:', err);
       window.print();

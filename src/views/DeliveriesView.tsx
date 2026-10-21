@@ -148,7 +148,7 @@ export const DeliveriesView: React.FC<DeliveriesViewProps> = ({
     try {
       setIsGeneratingPDF(true);
       await new Promise((r) => setTimeout(r, 60));
-      PDFGenerator.generateDeliveriesListPDF(filteredDeliveries, statusFilter, searchTerm);
+      await PDFGenerator.generateDeliveriesListPDF(filteredDeliveries, statusFilter, searchTerm);
     } catch (err) {
       console.error('Erro ao gerar PDF de entregas:', err);
       window.print();

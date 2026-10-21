@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StockMovement, EPIItem } from '../types/epi';
 import { CURRENT_DATE_STR, StorageService } from '../services/storage';
 import { PDFGenerator } from '../utils/pdfGenerator';
+import { generateQRCodeDataUrl } from '../utils/qrCodeGenerator';
 import {
   Printer,
   X,
@@ -16,6 +17,7 @@ import {
   FileDown,
   Loader2,
   Pencil,
+  QrCode,
 } from 'lucide-react';
 
 interface AuditReportModalProps {
@@ -38,11 +40,48 @@ export const AuditReportModal: React.FC<AuditReportModalProps> = ({
   onOpenHeaderConfig,
 }) => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const headerConfig = StorageService.getHeaderConfig();
   const companyTitle = headerConfig.title || 'SafeGuard EPI';
   const companyDocument = headerConfig.document;
   const subtitle = headerConfig.subtitle || 'SESMT — Serviço Especializado em Engenharia de Segurança e Medicina do Trabalho';
   const companyContact = [headerConfig.address, headerConfig.phone, headerConfig.contactEmail].filter(Boolean).join(' • ');
+
+  const reportCode = useMemo(
+    () => `REL-SST-${CURRENT_DATE_STR.replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
+    []
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const verificationUrl = StorageService.buildDocumentVerificationUrl(
+      reportCode,
+      'movimentacoes',
+      companyDocument
+    );
+
+    StorageService.saveOriginalDocument({
+      id: `doc-${reportCode.toLowerCase()}`,
+      code: reportCode,
+      type: 'movimentacoes',
+      title: 'Relatório Técnico de Auditoria e Livro de Movimentação de EPI',
+      companyId: 'default',
+      companyName: companyTitle,
+      companyDocument,
+      companySubtitle: subtitle,
+      generatedAt: new Date().toISOString(),
+      dateStr: CURRENT_DATE_STR,
+      sha256Hash: `SHA256-${Math.random().toString(36).substring(2, 10).toUpperCase()}${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      verificationUrl,
+      summaryText: `Auditoria de ${movements.length} movimentações de EPI emitido sob conformidade NR-6 / eSocial S-2240. Filtro: ${filterType}.`,
+      itemsCount: movements.length,
+      activeFilter: filterType,
+    });
+
+    generateQRCodeDataUrl(verificationUrl, 100).then((url) => {
+      setQrCodeUrl(url);
+    });
+  }, [isOpen, reportCode, movements.length, filterType, companyTitle, companyDocument, subtitle]);
 
   if (!isOpen) return null;
 
@@ -54,7 +93,7 @@ export const AuditReportModal: React.FC<AuditReportModalProps> = ({
     try {
       setIsGeneratingPDF(true);
       await new Promise((resolve) => setTimeout(resolve, 80));
-      PDFGenerator.generateMovementsAuditPDF(movements, epis, filterType, searchTerm);
+      await PDFGenerator.generateMovementsAuditPDF(movements, epis, filterType, searchTerm);
     } catch (err) {
       console.error('Erro ao gerar PDF de auditoria:', err);
       window.print();
@@ -74,8 +113,6 @@ export const AuditReportModal: React.FC<AuditReportModalProps> = ({
   const totalDeliveries = movements.filter((m) => m.type === 'saida_entrega').length;
   const totalDisposals = movements.filter((m) => m.type === 'baixa_descarte').length;
   const totalPurchases = movements.filter((m) => m.type === 'entrada').length;
-
-  const reportCode = `REL-SST-${CURRENT_DATE_STR.replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -195,15 +232,29 @@ export const AuditReportModal: React.FC<AuditReportModalProps> = ({
                 </div>
               </div>
 
-              <div className="text-left sm:text-right font-mono text-xs space-y-1">
-                <span className="inline-block bg-slate-100 border border-slate-300 px-2 py-0.5 rounded font-bold text-slate-800 text-[11px]">
-                  {reportCode}
-                </span>
-                <div className="text-[10px] text-slate-500">
-                  Emissão: {CURRENT_DATE_STR} às 16:45
-                </div>
-                <div className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded inline-block border border-emerald-200">
-                  Conformidade NR-6 / eSocial S-2240
+              <div className="flex items-center gap-3 shrink-0">
+                {qrCodeUrl && (
+                  <div className="flex flex-col items-center bg-white p-1 rounded border border-slate-200 shadow-2xs">
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Code de Validação do Documento Original"
+                      className="w-13 h-13 object-contain"
+                    />
+                    <span className="text-[8px] font-mono font-bold text-slate-700 uppercase mt-0.5 tracking-tighter">
+                      Doc Original
+                    </span>
+                  </div>
+                )}
+                <div className="text-left sm:text-right font-mono text-xs space-y-1">
+                  <span className="inline-block bg-slate-100 border border-slate-300 px-2 py-0.5 rounded font-bold text-slate-800 text-[11px]">
+                    {reportCode}
+                  </span>
+                  <div className="text-[10px] text-slate-500">
+                    Emissão: {CURRENT_DATE_STR}
+                  </div>
+                  <div className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded inline-block border border-emerald-200">
+                    Conformidade NR-6 / eSocial S-2240
+                  </div>
                 </div>
               </div>
             </div>

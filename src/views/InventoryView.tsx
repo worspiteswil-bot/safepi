@@ -143,7 +143,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     try {
       setIsGeneratingPDF(true);
       await new Promise((r) => setTimeout(r, 60));
-      PDFGenerator.generateInventoryPDF(filteredItems, selectedCategory, searchTerm);
+      await PDFGenerator.generateInventoryPDF(filteredItems, selectedCategory, searchTerm);
     } catch (err) {
       console.error('Erro ao gerar PDF do inventário:', err);
       window.print();
